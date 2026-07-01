@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 ANALYTICS_BASE = "https://seller-analytics-api.wildberries.ru"
+STATISTICS_BASE = "https://statistics-api.wildberries.ru"
 MARKETPLACE_BASE = "https://marketplace-api.wildberries.ru"
 CONTENT_BASE = "https://content-api.wildberries.ru"
 DAYS = int(os.getenv("WB_DAYS", "14"))
@@ -104,8 +105,14 @@ def stat_value(stat: dict[str, Any], keys: tuple[str, ...]) -> int:
 def stock_value(product: dict[str, Any]) -> int:
     stocks = product.get("stocks")
     if isinstance(stocks, dict):
-        return as_int(stocks.get("balanceSum") or stocks.get("wb") or stocks.get("mp"))
-    return as_int(product.get("stocks") or product.get("stock") or product.get("quantity") or product.get("remain"))
+        return as_int(
+            stocks.get("quantity")
+            or stocks.get("quantityFull")
+            or stocks.get("stock")
+            or stocks.get("qty")
+            or stocks.get("balanceQty")
+        )
+    return as_int(product.get("quantity") or product.get("quantityFull") or product.get("stock") or product.get("qty") or product.get("remain"))
 
 
 def fetch_products(token: str, period_start: date, period_end: date) -> list[Product]:
@@ -229,6 +236,26 @@ def fetch_card_tags(token: str) -> tuple[dict[int, dict[str, Any]], list[str]]:
     return result, warnings
 
 
+def fetch_current_stocks(token: str) -> tuple[dict[int, int], list[str]]:
+    stocks_by_nm: dict[int, int] = {}
+    warnings: list[str] = []
+    url = f"{STATISTICS_BASE}/api/v1/supplier/stocks?dateFrom=2019-06-20"
+    try:
+        data = api_json("GET", url, token)
+    except Exception:
+        warnings.append("Не удалось получить остатки WB в штуках. Проверьте, что токен имеет доступ к категории Статистика.")
+        return stocks_by_nm, warnings
+
+    rows = data if isinstance(data, list) else normalize_products_payload(data)
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        nm_id = as_int(row.get("nmId") or row.get("nmID"))
+        if not nm_id:
+            continue
+        stocks_by_nm[nm_id] = stocks_by_nm.get(nm_id, 0) + as_int(row.get("quantity"))
+    return stocks_by_nm, warnings
+
 def fetch_supplies(token: str) -> tuple[dict[int, list[dict[str, Any]]], list[str]]:
     supplies_by_nm: dict[int, list[dict[str, Any]]] = {}
     warnings: list[str] = []
@@ -287,6 +314,8 @@ def build_rows(products: list[Product], supplies: dict[int, list[dict[str, Any]]
     today = datetime.now(timezone.utc).date()
     rows: list[dict[str, Any]] = []
     for product in products:
+        if product.orders == 0 and product.stock == 0:
+            continue
         meta = card_meta.get(product.nm_id, {})
         manager_tags = list(meta.get("managerTags") or [])
         manager_text = ", ".join(manager_tags) if manager_tags else "Без ярлыка"
@@ -341,6 +370,11 @@ def main() -> None:
     warnings: list[str] = []
 
     products = fetch_products(token, period_start, period_end)
+    stock_by_nm, stock_warnings = fetch_current_stocks(token)
+    warnings.extend(stock_warnings)
+    if stock_by_nm:
+        for product in products:
+            product.stock = stock_by_nm.get(product.nm_id, 0)
     card_meta, tag_warnings = fetch_card_tags(token)
     warnings.extend(tag_warnings)
     supplies, supply_warnings = fetch_supplies(token)
