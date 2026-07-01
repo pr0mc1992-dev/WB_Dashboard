@@ -1,0 +1,18 @@
+{
+  "updatedAt": "2026-07-01T06:14:26.457Z",
+  "asOf": "2026-07-01",
+  "periodStart": "2026-06-17",
+  "periodEnd": "2026-06-30",
+  "summary": {
+    "skuCount": 0,
+    "dangerCount": 0,
+    "warningCount": 0,
+    "totalStock": 0,
+    "totalOrders14d": 0,
+    "totalReorderQty": 0
+  },
+  "warnings": [
+    "Данные появятся после первого запуска GitHub Actions"
+  ],
+  "rows": []
+}

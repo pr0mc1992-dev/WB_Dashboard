@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WB Догруз и остатки</title>
+  <style>
+    :root { color-scheme: light; --bg:#f4f6f8; --panel:#fff; --text:#17212b; --muted:#667085; --line:#d8dee8; --red:#c0392b; --red-bg:#fde8e6; --yellow:#a66a00; --yellow-bg:#fff3d8; --green:#117a46; --green-bg:#e6f4ec; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: Arial, sans-serif; background:var(--bg); color:var(--text); }
+    header { padding:18px 24px; background:#1d2939; color:#fff; display:flex; justify-content:space-between; gap:16px; align-items:flex-end; flex-wrap:wrap; }
+    h1 { margin:0; font-size:22px; }
+    .sub { color:#cbd5e1; font-size:13px; margin-top:6px; }
+    .stamp { text-align:right; font-size:12px; color:#dbe4ef; }
+    main { padding:20px 24px; max-width:1600px; margin:0 auto; }
+    .kpis { display:grid; grid-template-columns: repeat(5, minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
+    .kpi { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
+    .kpi .label { color:var(--muted); font-size:12px; }
+    .kpi .value { font-size:28px; font-weight:700; margin-top:6px; }
+    .toolbar { display:flex; gap:10px; margin:14px 0; flex-wrap:wrap; align-items:center; }
+    input, select { border:1px solid var(--line); background:#fff; border-radius:6px; padding:9px 10px; font-size:14px; }
+    input { min-width:300px; flex:1; }
+    .table-wrap { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:auto; }
+    table { width:100%; border-collapse:collapse; min-width:1320px; }
+    th, td { border-bottom:1px solid var(--line); padding:9px 10px; text-align:left; font-size:13px; vertical-align:top; }
+    th { position:sticky; top:0; background:#f8fafc; z-index:1; color:#475467; font-size:12px; }
+    tr.danger { background:var(--red-bg); }
+    tr.warning { background:var(--yellow-bg); }
+    tr.ok { background:var(--green-bg); }
+    .badge { display:inline-block; border-radius:999px; padding:3px 8px; font-weight:700; font-size:12px; white-space:nowrap; background:#fff; }
+    .danger .badge { color:var(--red); }
+    .warning .badge { color:var(--yellow); }
+    .ok .badge { color:var(--green); }
+    .neutral .badge { color:#475467; }
+    .num { text-align:right; white-space:nowrap; }
+    .title { min-width:260px; }
+    .warn { margin:12px 0; color:var(--yellow); font-size:13px; }
+    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2,1fr); } header { align-items:flex-start; } .stamp { text-align:left; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>WB Догруз и остатки</h1>
+      <div class="sub" id="period">Загрузка данных...</div>
+    </div>
+    <div class="stamp" id="updated"></div>
+  </header>
+  <main>
+    <section class="kpis">
+      <div class="kpi"><div class="label">SKU</div><div class="value" id="skuCount">-</div></div>
+      <div class="kpi"><div class="label">Красных</div><div class="value" id="dangerCount">-</div></div>
+      <div class="kpi"><div class="label">Желтых</div><div class="value" id="warningCount">-</div></div>
+      <div class="kpi"><div class="label">Остаток, шт</div><div class="value" id="totalStock">-</div></div>
+      <div class="kpi"><div class="label">К догрузу, шт</div><div class="value" id="totalReorderQty">-</div></div>
+    </section>
+    <div class="toolbar">
+      <input id="q" placeholder="Поиск по артикулу, WB, категории или товару">
+      <select id="severity">
+        <option value="">Все статусы</option>
+        <option value="danger">Только красные</option>
+        <option value="warning">Только желтые</option>
+        <option value="ok">OK</option>
+        <option value="neutral">Нет продаж</option>
+      </select>
+    </div>
+    <div class="warn" id="warnings"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Статус</th><th>Артикул поставщика</th><th>Артикул WB</th><th>Категория</th><th>Товар</th>
+            <th class="num">Остаток</th><th class="num">Заказы 14д</th><th class="num">Сред./день</th><th class="num">Дней остатка</th>
+            <th>Ближайшая поставка</th><th class="num">Дней до поставки</th><th class="num">В поставке</th><th class="num">К догрузу</th><th>Комментарий</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="14">Загрузка...</td></tr></tbody>
+      </table>
+    </div>
+  </main>
+  <script>
+    var rows = [];
+    var nf = new Intl.NumberFormat('ru-RU');
+    function byId(id){ return document.getElementById(id); }
+    function fmt(v){ return v === null || v === undefined || v === '' ? '' : nf.format(v); }
+    function esc(v){ return String(v == null ? '' : v).replace(/[&<>\"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]; }); }
+    function rowHtml(r){
+      return '<tr class="' + esc(r.severity) + '">' +
+        '<td><span class="badge">' + esc(r.status) + '</span></td>' +
+        '<td>' + esc(r.vendorCode) + '</td><td>' + esc(r.nmId) + '</td><td>' + esc(r.category) + '</td><td class="title">' + esc(r.title) + '</td>' +
+        '<td class="num">' + fmt(r.stock) + '</td><td class="num">' + fmt(r.orders14d) + '</td><td class="num">' + fmt(r.avgDaily) + '</td><td class="num">' + esc(r.stockDaysText) + '</td>' +
+        '<td>' + esc(r.nextSupplyDate) + '</td><td class="num">' + fmt(r.daysToSupply) + '</td><td class="num">' + fmt(r.nextSupplyQty) + '</td><td class="num"><b>' + fmt(r.reorderQty) + '</b></td><td>' + esc(r.comment) + '</td>' +
+      '</tr>';
+    }
+    function render(){
+      var q = byId('q').value.trim().toLowerCase();
+      var sev = byId('severity').value;
+      var filtered = rows.filter(function(r){
+        if (sev && r.severity !== sev) return false;
+        if (!q) return true;
+        return [r.vendorCode, r.nmId, r.category, r.title, r.status].join(' ').toLowerCase().indexOf(q) >= 0;
+      });
+      byId('tbody').innerHTML = filtered.map(rowHtml).join('') || '<tr><td colspan="14">Нет строк по фильтру</td></tr>';
+    }
+    fetch('data.json?ts=' + Date.now()).then(function(r){ return r.json(); }).then(function(data){
+      rows = data.rows || [];
+      byId('period').textContent = 'Период заказов: ' + data.periodStart + ' - ' + data.periodEnd + '; расчет на ' + data.asOf;
+      byId('updated').textContent = 'Обновлено: ' + data.updatedAt;
+      ['skuCount','dangerCount','warningCount','totalStock','totalReorderQty'].forEach(function(key){ byId(key).textContent = fmt(data.summary[key]); });
+      byId('warnings').textContent = (data.warnings || []).join(' | ');
+      render();
+    }).catch(function(err){ byId('tbody').innerHTML = '<tr><td colspan="14">Ошибка загрузки data.json: ' + esc(err) + '</td></tr>'; });
+    byId('q').addEventListener('input', render);
+    byId('severity').addEventListener('change', render);
+  </script>
+</body>
+</html>
