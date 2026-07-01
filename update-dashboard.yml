@@ -1,4 +1,4 @@
-name: Update WB Dashboard
+name: .github/workflows/update-dashboard.yml
 
 on:
   schedule:
