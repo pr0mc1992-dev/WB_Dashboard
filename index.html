@@ -1,117 +1,278 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>WB Догруз и остатки</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WB Dashboard</title>
   <style>
-    :root { color-scheme: light; --bg:#f4f6f8; --panel:#fff; --text:#17212b; --muted:#667085; --line:#d8dee8; --red:#c0392b; --red-bg:#fde8e6; --yellow:#a66a00; --yellow-bg:#fff3d8; --green:#117a46; --green-bg:#e6f4ec; }
+    :root {
+      color-scheme: dark;
+      --bg: #091018;
+      --panel: #111a24;
+      --panel-2: #162231;
+      --line: #263545;
+      --text: #edf4fb;
+      --muted: #92a1b3;
+      --red: #ff5c68;
+      --yellow: #f3b646;
+      --green: #31c48d;
+      --blue: #55a7ff;
+    }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: Arial, sans-serif; background:var(--bg); color:var(--text); }
-    header { padding:18px 24px; background:#1d2939; color:#fff; display:flex; justify-content:space-between; gap:16px; align-items:flex-end; flex-wrap:wrap; }
-    h1 { margin:0; font-size:22px; }
-    .sub { color:#cbd5e1; font-size:13px; margin-top:6px; }
-    .stamp { text-align:right; font-size:12px; color:#dbe4ef; }
-    main { padding:20px 24px; max-width:1600px; margin:0 auto; }
-    .kpis { display:grid; grid-template-columns: repeat(5, minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
-    .kpi { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
-    .kpi .label { color:var(--muted); font-size:12px; }
-    .kpi .value { font-size:28px; font-weight:700; margin-top:6px; }
-    .toolbar { display:flex; gap:10px; margin:14px 0; flex-wrap:wrap; align-items:center; }
-    input, select { border:1px solid var(--line); background:#fff; border-radius:6px; padding:9px 10px; font-size:14px; }
-    input { min-width:300px; flex:1; }
-    .table-wrap { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:auto; }
-    table { width:100%; border-collapse:collapse; min-width:1320px; }
-    th, td { border-bottom:1px solid var(--line); padding:9px 10px; text-align:left; font-size:13px; vertical-align:top; }
-    th { position:sticky; top:0; background:#f8fafc; z-index:1; color:#475467; font-size:12px; }
-    tr.danger { background:var(--red-bg); }
-    tr.warning { background:var(--yellow-bg); }
-    tr.ok { background:var(--green-bg); }
-    .badge { display:inline-block; border-radius:999px; padding:3px 8px; font-weight:700; font-size:12px; white-space:nowrap; background:#fff; }
-    .danger .badge { color:var(--red); }
-    .warning .badge { color:var(--yellow); }
-    .ok .badge { color:var(--green); }
-    .neutral .badge { color:#475467; }
-    .num { text-align:right; white-space:nowrap; }
-    .title { min-width:260px; }
-    .warn { margin:12px 0; color:var(--yellow); font-size:13px; }
-    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2,1fr); } header { align-items:flex-start; } .stamp { text-align:left; } }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.35 Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: min(100vw - 24px, 1720px); margin: 0 auto; padding: 14px 0; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+    h1 { margin: 0; font-size: 20px; letter-spacing: 0; }
+    .meta { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .kpis { display: grid; grid-template-columns: repeat(6, minmax(130px, 1fr)); gap: 8px; margin-bottom: 10px; }
+    .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; min-height: 56px; }
+    .kpi span { display: block; color: var(--muted); font-size: 11px; }
+    .kpi strong { display: block; margin-top: 4px; font-size: 18px; }
+    .toolbar { display: grid; grid-template-columns: 180px 220px 150px 1fr 130px; gap: 8px; align-items: end; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    label { display: grid; gap: 4px; color: var(--muted); font-size: 11px; }
+    input, select, button { height: 34px; border-radius: 7px; border: 1px solid var(--line); background: #0c1520; color: var(--text); padding: 0 10px; font: inherit; }
+    button { cursor: pointer; background: var(--panel-2); }
+    button:disabled { opacity: .45; cursor: default; }
+    .table-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .table-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    .pager { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+    .pager button { width: 34px; padding: 0; }
+    .table-wrap { overflow: auto; max-height: calc(100vh - 238px); }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; min-width: 1120px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 6px 7px; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    th { position: sticky; top: 0; z-index: 1; background: #0e1824; color: var(--muted); text-align: left; font-size: 11px; font-weight: 600; }
+    tr[data-status="critical"] { background: rgba(255, 92, 104, .09); }
+    tr[data-status="warning"] { background: rgba(243, 182, 70, .08); }
+    .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 68px; height: 22px; border-radius: 999px; padding: 0 8px; font-size: 11px; font-weight: 700; }
+    .critical { color: #ffd8dc; background: rgba(255, 92, 104, .24); }
+    .warning { color: #ffe7b4; background: rgba(243, 182, 70, .23); }
+    .ok { color: #c7f7e2; background: rgba(49, 196, 141, .2); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .manager { color: #dfe9f4; }
+    .muted { color: var(--muted); }
+    .warnings { margin-top: 8px; color: #ffd27a; font-size: 12px; }
+    .empty { padding: 28px; text-align: center; color: var(--muted); }
+    .col-status { width: 86px; }
+    .col-manager { width: 140px; }
+    .col-vendor { width: 150px; }
+    .col-nm { width: 110px; }
+    .col-name { width: 210px; }
+    .col-cat { width: 150px; }
+    .col-small { width: 86px; }
+    .col-supply { width: 112px; }
+    @media (max-width: 980px) {
+      main { width: calc(100vw - 12px); padding: 8px 0; }
+      header { align-items: flex-start; flex-direction: column; }
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .toolbar { grid-template-columns: 1fr; }
+      .table-wrap { max-height: calc(100vh - 390px); }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <div>
-      <h1>WB Догруз и остатки</h1>
-      <div class="sub" id="period">Загрузка данных...</div>
-    </div>
-    <div class="stamp" id="updated"></div>
-  </header>
   <main>
+    <header>
+      <div>
+        <h1>WB Dashboard</h1>
+        <div class="meta" id="period">Загрузка данных...</div>
+      </div>
+      <div class="meta" id="updated"></div>
+    </header>
+
     <section class="kpis">
-      <div class="kpi"><div class="label">SKU</div><div class="value" id="skuCount">-</div></div>
-      <div class="kpi"><div class="label">Красных</div><div class="value" id="dangerCount">-</div></div>
-      <div class="kpi"><div class="label">Желтых</div><div class="value" id="warningCount">-</div></div>
-      <div class="kpi"><div class="label">Остаток, шт</div><div class="value" id="totalStock">-</div></div>
-      <div class="kpi"><div class="label">К догрузу, шт</div><div class="value" id="totalReorderQty">-</div></div>
+      <div class="kpi"><span>Позиций</span><strong id="kpiTotal">-</strong></div>
+      <div class="kpi"><span>Нужен догруз</span><strong id="kpiCritical">-</strong></div>
+      <div class="kpi"><span>Проверить</span><strong id="kpiWarning">-</strong></div>
+      <div class="kpi"><span>К догрузу, шт.</span><strong id="kpiQty">-</strong></div>
+      <div class="kpi"><span>Менеджеров</span><strong id="kpiManagers">-</strong></div>
+      <div class="kpi"><span>Без ярлыка</span><strong id="kpiNoTags">-</strong></div>
     </section>
-    <div class="toolbar">
-      <input id="q" placeholder="Поиск по артикулу, WB, категории или товару">
-      <select id="severity">
-        <option value="">Все статусы</option>
-        <option value="danger">Только красные</option>
-        <option value="warning">Только желтые</option>
-        <option value="ok">OK</option>
-        <option value="neutral">Нет продаж</option>
-      </select>
-    </div>
-    <div class="warn" id="warnings"></div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Статус</th><th>Артикул поставщика</th><th>Артикул WB</th><th>Категория</th><th>Товар</th>
-            <th class="num">Остаток</th><th class="num">Заказы 14д</th><th class="num">Сред./день</th><th class="num">Дней остатка</th>
-            <th>Ближайшая поставка</th><th class="num">Дней до поставки</th><th class="num">В поставке</th><th class="num">К догрузу</th><th>Комментарий</th>
-          </tr>
-        </thead>
-        <tbody id="tbody"><tr><td colspan="14">Загрузка...</td></tr></tbody>
-      </table>
-    </div>
+
+    <section class="toolbar">
+      <label>Артикул WB<input id="nmFilter" inputmode="numeric" placeholder="Например 123456789" /></label>
+      <label>Менеджер<select id="managerFilter"><option value="">Все менеджеры</option></select></label>
+      <label>Статус<select id="statusFilter"><option value="">Все</option><option value="critical">Нужен догруз</option><option value="warning">Проверить</option><option value="ok">ОК</option></select></label>
+      <label>Поиск<input id="searchFilter" placeholder="Артикул поставщика, товар, категория" /></label>
+      <label>Строк на лист<select id="pageSize"><option>20</option><option selected>30</option><option>50</option><option>100</option></select></label>
+    </section>
+
+    <section class="table-card">
+      <div class="table-head">
+        <strong id="resultInfo">-</strong>
+        <div class="pager">
+          <button id="prevPage" title="Предыдущий лист">‹</button>
+          <span id="pageInfo">Лист 1</span>
+          <button id="nextPage" title="Следующий лист">›</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-status">Статус</th>
+              <th class="col-manager">Менеджер</th>
+              <th class="col-vendor">Арт. поставщика</th>
+              <th class="col-nm">Арт. WB</th>
+              <th class="col-name">Товар</th>
+              <th class="col-cat">Категория</th>
+              <th class="col-small num">Остаток</th>
+              <th class="col-small num">Заказы</th>
+              <th class="col-small num">Ср/день</th>
+              <th class="col-small num">Дней</th>
+              <th class="col-supply">Поставка</th>
+              <th class="col-small num">В пути</th>
+              <th class="col-small num">Догруз</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden>Нет строк под выбранные фильтры</div>
+      </div>
+    </section>
+    <div class="warnings" id="warnings"></div>
   </main>
+
   <script>
-    var rows = [];
-    var nf = new Intl.NumberFormat('ru-RU');
-    function byId(id){ return document.getElementById(id); }
-    function fmt(v){ return v === null || v === undefined || v === '' ? '' : nf.format(v); }
-    function esc(v){ return String(v == null ? '' : v).replace(/[&<>\"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]; }); }
-    function rowHtml(r){
-      return '<tr class="' + esc(r.severity) + '">' +
-        '<td><span class="badge">' + esc(r.status) + '</span></td>' +
-        '<td>' + esc(r.vendorCode) + '</td><td>' + esc(r.nmId) + '</td><td>' + esc(r.category) + '</td><td class="title">' + esc(r.title) + '</td>' +
-        '<td class="num">' + fmt(r.stock) + '</td><td class="num">' + fmt(r.orders14d) + '</td><td class="num">' + fmt(r.avgDaily) + '</td><td class="num">' + esc(r.stockDaysText) + '</td>' +
-        '<td>' + esc(r.nextSupplyDate) + '</td><td class="num">' + fmt(r.daysToSupply) + '</td><td class="num">' + fmt(r.nextSupplyQty) + '</td><td class="num"><b>' + fmt(r.reorderQty) + '</b></td><td>' + esc(r.comment) + '</td>' +
-      '</tr>';
+    const state = { data: null, rows: [], filtered: [], page: 1 };
+    const $ = (id) => document.getElementById(id);
+    const fmt = new Intl.NumberFormat('ru-RU');
+
+    function num(value, suffix = '') {
+      if (value === null || value === undefined || value === '') return '-';
+      return fmt.format(value) + suffix;
     }
-    function render(){
-      var q = byId('q').value.trim().toLowerCase();
-      var sev = byId('severity').value;
-      var filtered = rows.filter(function(r){
-        if (sev && r.severity !== sev) return false;
-        if (!q) return true;
-        return [r.vendorCode, r.nmId, r.category, r.title, r.status].join(' ').toLowerCase().indexOf(q) >= 0;
+
+    function dateShort(value) {
+      if (!value) return '-';
+      const date = new Date(value + 'T00:00:00');
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+    }
+
+    function fillManagers() {
+      const select = $('managerFilter');
+      const tags = new Set();
+      let noTag = false;
+      for (const row of state.rows) {
+        if (row.managerTags && row.managerTags.length) row.managerTags.forEach((tag) => tags.add(tag));
+        else noTag = true;
+      }
+      [...tags].sort((a, b) => a.localeCompare(b, 'ru')).forEach((tag) => {
+        const option = document.createElement('option');
+        option.value = tag;
+        option.textContent = tag;
+        select.appendChild(option);
       });
-      byId('tbody').innerHTML = filtered.map(rowHtml).join('') || '<tr><td colspan="14">Нет строк по фильтру</td></tr>';
+      if (noTag) {
+        const option = document.createElement('option');
+        option.value = '__no_tag__';
+        option.textContent = 'Без ярлыка';
+        select.appendChild(option);
+      }
     }
-    fetch('data.json?ts=' + Date.now()).then(function(r){ return r.json(); }).then(function(data){
-      rows = data.rows || [];
-      byId('period').textContent = 'Период заказов: ' + data.periodStart + ' - ' + data.periodEnd + '; расчет на ' + data.asOf;
-      byId('updated').textContent = 'Обновлено: ' + data.updatedAt;
-      ['skuCount','dangerCount','warningCount','totalStock','totalReorderQty'].forEach(function(key){ byId(key).textContent = fmt(data.summary[key]); });
-      byId('warnings').textContent = (data.warnings || []).join(' | ');
-      render();
-    }).catch(function(err){ byId('tbody').innerHTML = '<tr><td colspan="14">Ошибка загрузки data.json: ' + esc(err) + '</td></tr>'; });
-    byId('q').addEventListener('input', render);
-    byId('severity').addEventListener('change', render);
+
+    function applyFilters(resetPage = true) {
+      const nm = $('nmFilter').value.trim();
+      const manager = $('managerFilter').value;
+      const status = $('statusFilter').value;
+      const search = $('searchFilter').value.trim().toLowerCase();
+      state.filtered = state.rows.filter((row) => {
+        const rowTags = row.managerTags || [];
+        if (nm && !String(row.nmId || '').includes(nm)) return false;
+        if (manager === '__no_tag__' && rowTags.length) return false;
+        if (manager && manager !== '__no_tag__' && !rowTags.includes(manager)) return false;
+        if (status && row.status !== status) return false;
+        if (search) {
+          const haystack = [row.vendorCode, row.nmId, row.name, row.category, row.managerText].join(' ').toLowerCase();
+          if (!haystack.includes(search)) return false;
+        }
+        return true;
+      });
+      if (resetPage) state.page = 1;
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = $('rows');
+      tbody.textContent = '';
+      const pageSize = Number($('pageSize').value || 30);
+      const totalPages = Math.max(1, Math.ceil(state.filtered.length / pageSize));
+      state.page = Math.min(Math.max(state.page, 1), totalPages);
+      const start = (state.page - 1) * pageSize;
+      const pageRows = state.filtered.slice(start, start + pageSize);
+
+      for (const row of pageRows) {
+        const tr = document.createElement('tr');
+        tr.dataset.status = row.status || 'ok';
+        const daysLeft = row.daysLeft === null || row.daysLeft === undefined ? '-' : num(row.daysLeft, ' дн.');
+        const supplyText = row.nextSupplyDate ? dateShort(row.nextSupplyDate) : 'Нет';
+        tr.innerHTML = `
+          <td><span class="badge ${row.status || 'ok'}">${row.statusText || 'ОК'}</span></td>
+          <td class="manager" title="${escapeHtml(row.managerText || '')}">${escapeHtml(row.managerText || 'Без ярлыка')}</td>
+          <td title="${escapeHtml(row.vendorCode || '')}">${escapeHtml(row.vendorCode || '-')}</td>
+          <td>${escapeHtml(String(row.nmId || '-'))}</td>
+          <td title="${escapeHtml(row.name || '')}">${escapeHtml(row.name || '-')}</td>
+          <td title="${escapeHtml(row.category || '')}">${escapeHtml(row.category || '-')}</td>
+          <td class="num">${num(row.stock)}</td>
+          <td class="num">${num(row.orders14d)}</td>
+          <td class="num">${num(row.avgDailySales)}</td>
+          <td class="num">${daysLeft}</td>
+          <td>${escapeHtml(supplyText)}</td>
+          <td class="num">${num(row.nextSupplyQty)}</td>
+          <td class="num"><strong>${num(row.requiredQty)}</strong></td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      $('empty').hidden = state.filtered.length !== 0;
+      $('resultInfo').textContent = `Показано ${fmt.format(pageRows.length)} из ${fmt.format(state.filtered.length)} строк`;
+      $('pageInfo').textContent = `Лист ${state.page} из ${totalPages}`;
+      $('prevPage').disabled = state.page <= 1;
+      $('nextPage').disabled = state.page >= totalPages;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+    }
+
+    function wire() {
+      ['nmFilter', 'managerFilter', 'statusFilter', 'searchFilter', 'pageSize'].forEach((id) => {
+        $(id).addEventListener('input', () => applyFilters(true));
+        $(id).addEventListener('change', () => applyFilters(true));
+      });
+      $('prevPage').addEventListener('click', () => { state.page -= 1; renderTable(); });
+      $('nextPage').addEventListener('click', () => { state.page += 1; renderTable(); });
+    }
+
+    async function load() {
+      const response = await fetch('data.json?ts=' + Date.now(), { cache: 'no-store' });
+      const data = await response.json();
+      state.data = data;
+      state.rows = data.rows || [];
+      const summary = data.summary || {};
+      $('kpiTotal').textContent = num(summary.totalItems);
+      $('kpiCritical').textContent = num(summary.criticalItems);
+      $('kpiWarning').textContent = num(summary.warningItems);
+      $('kpiQty').textContent = num(summary.totalRequiredQty);
+      $('kpiManagers').textContent = num(summary.managerCount);
+      $('kpiNoTags').textContent = num(summary.withoutManagerTags);
+      $('period').textContent = `Заказы: ${data.period?.from || '-'} - ${data.period?.to || '-'} (${data.period?.days || '-'} дней)`;
+      $('updated').textContent = data.generatedAt ? `Обновлено: ${new Date(data.generatedAt).toLocaleString('ru-RU')}` : '';
+      $('warnings').textContent = (data.warnings || []).join(' ');
+      fillManagers();
+      applyFilters(true);
+    }
+
+    wire();
+    load().catch((error) => {
+      $('period').textContent = 'Не удалось загрузить данные';
+      $('warnings').textContent = error.message || String(error);
+    });
   </script>
 </body>
 </html>
