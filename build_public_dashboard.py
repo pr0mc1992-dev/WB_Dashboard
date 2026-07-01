@@ -94,33 +94,64 @@ def normalize_products_payload(data: Any) -> list[dict[str, Any]]:
     return []
 
 
+def stat_value(stat: dict[str, Any], keys: tuple[str, ...]) -> int:
+    for key in keys:
+        if key in stat:
+            return as_int(stat.get(key))
+    return 0
+
+
+def stock_value(product: dict[str, Any]) -> int:
+    stocks = product.get("stocks")
+    if isinstance(stocks, dict):
+        return as_int(stocks.get("balanceSum") or stocks.get("wb") or stocks.get("mp"))
+    return as_int(product.get("stocks") or product.get("stock") or product.get("quantity") or product.get("remain"))
+
+
 def fetch_products(token: str, period_start: date, period_end: date) -> list[Product]:
-    payload = {
-        "dateFrom": period_start.isoformat(),
-        "dateTo": period_end.isoformat(),
-        "timezone": "Europe/Moscow",
-        "orderBy": {"field": "orders", "mode": "desc"},
-        "page": 1,
-        "limit": 1000,
-    }
-    data = api_json("POST", f"{ANALYTICS_BASE}/api/analytics/v3/sales-funnel/products", token, payload=payload)
-    rows = normalize_products_payload(data)
     products: list[Product] = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        nm_id = as_int(row.get("nmID") or row.get("nmId") or row.get("nm_id"))
-        if not nm_id:
-            continue
-        product = Product(
-            nm_id=nm_id,
-            vendor_code=first_text(row, ("vendorCode", "supplierArticle", "article", "sa_name")),
-            name=first_text(row, ("brandName", "name", "title", "subjectName")),
-            category=first_text(row, ("subjectName", "object", "category", "categoryName")),
-            orders=as_int(row.get("orders") or row.get("ordersCount") or row.get("orderedUnits")),
-            stock=as_int(row.get("stocks") or row.get("stock") or row.get("quantity") or row.get("remain")),
-        )
-        products.append(product)
+    offset = 0
+    limit = 1000
+
+    while True:
+        payload = {
+            "selectedPeriod": {"start": period_start.isoformat(), "end": period_end.isoformat()},
+            "nmIds": [],
+            "brandNames": [],
+            "subjectIds": [],
+            "tagIds": [],
+            "skipDeletedNm": False,
+            "limit": limit,
+            "offset": offset,
+        }
+        data = api_json("POST", f"{ANALYTICS_BASE}/api/analytics/v3/sales-funnel/products", token, payload=payload)
+        rows = normalize_products_payload(data)
+        if not rows:
+            break
+
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            product_data = row.get("product") if isinstance(row.get("product"), dict) else row
+            statistic = row.get("statistic") if isinstance(row.get("statistic"), dict) else {}
+            selected = statistic.get("selected") if isinstance(statistic.get("selected"), dict) else row
+            nm_id = as_int(product_data.get("nmID") or product_data.get("nmId") or product_data.get("nm_id"))
+            if not nm_id:
+                continue
+            products.append(Product(
+                nm_id=nm_id,
+                vendor_code=first_text(product_data, ("vendorCode", "supplierArticle", "article", "sa_name")),
+                name=first_text(product_data, ("title", "name", "brandName", "subjectName")),
+                category=first_text(product_data, ("subjectName", "object", "category", "categoryName")),
+                orders=stat_value(selected, ("orderCount", "orders", "ordersCount", "orderedUnits")),
+                stock=stock_value(product_data),
+            ))
+
+        if len(rows) < limit:
+            break
+        offset += limit
+        time.sleep(21)
+
     return products
 
 
