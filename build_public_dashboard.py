@@ -385,13 +385,22 @@ def build_rows(products: list[Product], supplies: dict[int, list[dict[str, Any]]
             if supply_date:
                 days_to_supply = max((supply_date - today).days, 0)
 
-        supply_qty = sum(as_int(x.get("quantity")) for x in item_supplies)
+        counted_supplies: list[dict[str, Any]] = []
+        for supply in item_supplies:
+            supply_date = parse_date(str(supply.get("date") or ""))
+            if not supply_date:
+                continue
+            supply_days = max((supply_date - today).days, 0)
+            if math.isinf(days_left) or supply_days <= days_left:
+                counted_supplies.append(supply)
+
+        supply_qty = sum(as_int(x.get("quantity")) for x in counted_supplies)
         target_days = RESTOCK_DAYS_DEFAULT
         required_qty = max(math.ceil(avg_daily_sales * target_days - product.stock - supply_qty), 0)
 
         needs_restock = days_left < LOW_STOCK_DAYS
         gap_to_supply = days_to_supply is not None and days_left < days_to_supply
-        status = "critical" if needs_restock and not item_supplies else "warning" if needs_restock or gap_to_supply else "ok"
+        status = "critical" if needs_restock and not counted_supplies else "warning" if needs_restock or gap_to_supply else "ok"
 
         rows.append({
             "status": status,
