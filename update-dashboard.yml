@@ -1,4 +1,4 @@
-name: .github/workflows/update-dashboard.yml
+name: Update WB Dashboard
 
 on:
   schedule:
@@ -8,26 +8,39 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - run: pip install -r requirements.txt
+      - name: Install Python requirements
+        run: pip install -r requirements.txt
 
-      - run: python scripts/build_public_dashboard.py
+      - name: Prepare public folder
+        run: |
+          mkdir -p public
+          cp index.html public/index.html
+
+      - name: Build dashboard data
+        run: python build_public_dashboard.py
         env:
           WB_API_TOKEN: ${{ secrets.WB_API_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - run: npm install -g netlify-cli
+      - name: Install Netlify CLI
+        run: npm install -g netlify-cli
 
-      - run: netlify deploy --prod --dir=public --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
+      - name: Deploy to Netlify
+        run: netlify deploy --prod --dir=public --site="$NETLIFY_SITE_ID" --auth="$NETLIFY_AUTH_TOKEN"
         env:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
