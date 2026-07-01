@@ -13,9 +13,11 @@ from typing import Any
 ANALYTICS_BASE = "https://seller-analytics-api.wildberries.ru"
 STATISTICS_BASE = "https://statistics-api.wildberries.ru"
 MARKETPLACE_BASE = "https://marketplace-api.wildberries.ru"
+SUPPLIES_BASE = "https://supplies-api.wildberries.ru"
 CONTENT_BASE = "https://content-api.wildberries.ru"
 DAYS = int(os.getenv("WB_DAYS", "14"))
 LOW_STOCK_DAYS = float(os.getenv("WB_LOW_STOCK_DAYS", "10"))
+RESTOCK_DAYS_DEFAULT = int(os.getenv("WB_RESTOCK_DAYS", "14"))
 SUPPLY_LOOKAHEAD_DAYS = int(os.getenv("WB_SUPPLY_LOOKAHEAD_DAYS", "90"))
 PUBLIC_DIR = Path(os.getenv("PUBLIC_DIR", "public"))
 DATA_PATH = PUBLIC_DIR / "data.json"
@@ -256,44 +258,97 @@ def fetch_current_stocks(token: str) -> tuple[dict[int, int], list[str]]:
         stocks_by_nm[nm_id] = stocks_by_nm.get(nm_id, 0) + as_int(row.get("quantity"))
     return stocks_by_nm, warnings
 
+def supply_rows(data: Any) -> list[dict[str, Any]]:
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    if isinstance(data, dict):
+        for key in ("result", "supplies", "data", "items"):
+            value = data.get(key)
+            if isinstance(value, list):
+                return [row for row in value if isinstance(row, dict)]
+    return []
+
+
+def fetch_supply_goods(token: str, supply_id: int, is_preorder_id: bool) -> list[dict[str, Any]]:
+    goods: list[dict[str, Any]] = []
+    offset = 0
+    limit = 1000
+    preorder_flag = "true" if is_preorder_id else "false"
+    while True:
+        query = urllib.parse.urlencode({"limit": limit, "offset": offset, "isPreorderID": preorder_flag})
+        data = api_json("GET", f"{SUPPLIES_BASE}/api/v1/supplies/{supply_id}/goods?{query}", token)
+        rows = supply_rows(data)
+        goods.extend(rows)
+        if len(rows) < limit:
+            break
+        offset += limit
+        time.sleep(2.1)
+    return goods
+
+
 def fetch_supplies(token: str) -> tuple[dict[int, list[dict[str, Any]]], list[str]]:
     supplies_by_nm: dict[int, list[dict[str, Any]]] = {}
     warnings: list[str] = []
-    try:
-        data = api_json("GET", f"{MARKETPLACE_BASE}/api/v3/supplies", token)
-    except Exception:
-        warnings.append("Не удалось получить список поставок WB. Расчет ближайшей поставки временно пустой.")
-        return supplies_by_nm, warnings
-
-    raw_supplies = data.get("supplies") if isinstance(data, dict) else []
-    if not isinstance(raw_supplies, list):
-        return supplies_by_nm, warnings
-
     today = datetime.now(timezone.utc).date()
     cutoff = today + timedelta(days=SUPPLY_LOOKAHEAD_DAYS)
-    for supply in raw_supplies:
-        if not isinstance(supply, dict):
-            continue
-        supply_id = supply.get("id") or supply.get("supplyId")
-        date_text = first_text(supply, ("plannedDate", "createdAt", "doneAt", "date"))
-        supply_date = parse_date(date_text)
-        if supply_date and supply_date > cutoff:
-            continue
-        orders = supply.get("orders") if isinstance(supply.get("orders"), list) else []
-        for order in orders:
-            if not isinstance(order, dict):
-                continue
-            nm_id = as_int(order.get("nmId") or order.get("nmID"))
-            if not nm_id:
-                continue
-            qty = as_int(order.get("quantity") or order.get("qty") or order.get("count") or 1)
-            supplies_by_nm.setdefault(nm_id, []).append({
-                "supplyId": str(supply_id or ""),
-                "date": supply_date.isoformat() if supply_date else "",
-                "quantity": qty,
-            })
-    return supplies_by_nm, warnings
+    offset = 0
+    limit = 1000
+    active_supply_statuses = [2, 3, 4, 6]
 
+    while True:
+        query = urllib.parse.urlencode({"limit": limit, "offset": offset})
+        payload = {
+            "dates": [{"from": today.isoformat(), "till": cutoff.isoformat(), "type": "supplyDate"}],
+            "statusIDs": active_supply_statuses,
+        }
+        try:
+            data = api_json("POST", f"{SUPPLIES_BASE}/api/v1/supplies?{query}", token, payload=payload)
+        except Exception as exc:
+            warnings.append(f"Не удалось получить поставки WB через API поставок: {str(exc)[:220]}. Проверьте, что токен WB_API_TOKEN имеет доступ к категории Supplies/Поставки.")
+            return supplies_by_nm, warnings
+
+        supplies = supply_rows(data)
+        if not supplies:
+            break
+
+        for supply in supplies:
+            supply_id = as_int(supply.get("supplyID"))
+            preorder_id = as_int(supply.get("preorderID"))
+            lookup_id = supply_id or preorder_id
+            if not lookup_id:
+                continue
+            supply_date = parse_date(first_text(supply, ("supplyDate", "createDate", "updatedDate")))
+            if supply_date and (supply_date < today or supply_date > cutoff):
+                continue
+
+            try:
+                goods = fetch_supply_goods(token, lookup_id, not bool(supply_id))
+            except Exception as exc:
+                warnings.append(f"Не удалось получить состав поставки {lookup_id}: {str(exc)[:180]}")
+                continue
+
+            for item in goods:
+                nm_id = as_int(item.get("nmID") or item.get("nmId"))
+                if not nm_id:
+                    continue
+                qty = as_int(item.get("quantity"))
+                ready_qty = as_int(item.get("readyForSaleQuantity"))
+                qty_to_supply = max(qty - ready_qty, 0)
+                if qty_to_supply <= 0:
+                    continue
+                supplies_by_nm.setdefault(nm_id, []).append({
+                    "supplyId": str(supply_id or preorder_id or ""),
+                    "date": supply_date.isoformat() if supply_date else "",
+                    "quantity": qty_to_supply,
+                })
+            time.sleep(2.1)
+
+        if len(supplies) < limit:
+            break
+        offset += limit
+        time.sleep(2.1)
+
+    return supplies_by_nm, warnings
 
 def parse_date(value: str) -> date | None:
     if not value:
@@ -331,7 +386,7 @@ def build_rows(products: list[Product], supplies: dict[int, list[dict[str, Any]]
                 days_to_supply = max((supply_date - today).days, 0)
 
         supply_qty = sum(as_int(x.get("quantity")) for x in item_supplies)
-        target_days = max(LOW_STOCK_DAYS, float(days_to_supply or 0))
+        target_days = RESTOCK_DAYS_DEFAULT
         required_qty = max(math.ceil(avg_daily_sales * target_days - product.stock - supply_qty), 0)
 
         needs_restock = days_left < LOW_STOCK_DAYS
@@ -390,7 +445,7 @@ def main() -> None:
     payload = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "period": {"from": period_start.isoformat(), "to": period_end.isoformat(), "days": DAYS},
-        "thresholds": {"lowStockDays": LOW_STOCK_DAYS, "supplyLookaheadDays": SUPPLY_LOOKAHEAD_DAYS},
+        "thresholds": {"lowStockDays": LOW_STOCK_DAYS, "restockDaysDefault": RESTOCK_DAYS_DEFAULT, "supplyLookaheadDays": SUPPLY_LOOKAHEAD_DAYS},
         "summary": {
             "totalItems": len(rows),
             "criticalItems": critical,
