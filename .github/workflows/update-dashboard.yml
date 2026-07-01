@@ -11,8 +11,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: wb-dashboard-pages
+  cancel-in-progress: true
 
 jobs:
   update:
@@ -34,9 +34,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Prepare public folder
-        run: |
-          mkdir -p public
-          cp index.html public/index.html
+        run: mkdir -p public && cp index.html public/index.html
 
       - name: Build dashboard data
         run: python build_public_dashboard.py
@@ -46,11 +44,14 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload GitHub Pages artifact
+      - name: Upload dashboard artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          name: wb-dashboard-pages
           path: public
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: wb-dashboard-pages
